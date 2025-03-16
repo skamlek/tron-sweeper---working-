@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}TRON Sweeper Bot{% endblock %}</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+            padding-bottom: 20px;
+        }
+        .tron-header {
+            border-bottom: 1px solid var(--bs-secondary-bg);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+        }
+        .status-running {
+            color: var(--bs-success);
+        }
+        .status-stopped {
+            color: var(--bs-danger);
+        }
+        .status-warning {
+            color: var(--bs-warning);
+        }
+        .address {
+            font-family: monospace;
+            word-break: break-all;
+        }
+        .tron-footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid var(--bs-secondary-bg);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="tron-header d-flex flex-wrap justify-content-between align-items-center">
+            <h1>TRON Sweeper Bot</h1>
+            <nav>
+                <ul class="nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('transactions') }}">Transactions</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('config') }}">Configuration</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+
+        <footer class="tron-footer">
+            <p class="text-secondary">&copy; 2025 TRON Sweeper Bot</p>
+        </footer>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

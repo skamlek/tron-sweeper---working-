@@ -1,0 +1,245 @@
+{% extends 'base.html' %}
+
+{% block title %}Configuration - TRON Sweeper Bot{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h4>Bot Configuration</h4>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('config') }}">
+            <div class="alert alert-info">
+                <h5>Security Notice</h5>
+                <p>Your private key is stored securely in the database and is only used for signing transactions.</p>
+                <p>For maximum security, we recommend using a dedicated wallet with minimal funds for the source address.</p>
+            </div>
+
+            <h5 class="mb-3">Required Settings</h5>
+            
+            <div class="mb-3">
+                <label for="source_private_key" class="form-label">Source Wallet Private Key</label>
+                <input type="password" class="form-control" id="source_private_key" name="source_private_key" 
+                       value="{{ config.source_private_key if config else '' }}" required>
+                <div class="form-text">This is the private key of the wallet to monitor and sweep funds from.</div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="source_address" class="form-label">Source Wallet Address</label>
+                <input type="text" class="form-control" id="source_address" name="source_address" 
+                       value="{{ config.source_address if config else '' }}" required>
+                <div class="form-text">The TRON address to monitor (must match the private key above).</div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="destination_address" class="form-label">Destination Wallet Address</label>
+                <input type="text" class="form-control" id="destination_address" name="destination_address" 
+                       value="{{ config.destination_address if config else '' }}" required>
+                <div class="form-text">The TRON address where funds will be transferred to.</div>
+            </div>
+            
+            <h5 class="mb-3 mt-4">Blockchain Settings</h5>
+            
+            <div class="mb-3">
+                <label for="blockchain" class="form-label">Blockchain</label>
+                <select class="form-select" id="blockchain" name="blockchain">
+                    <option value="tron" {% if config and config.blockchain == 'tron' %}selected{% endif %}>TRON</option>
+                    <option value="bsc" {% if config and config.blockchain == 'bsc' %}selected{% endif %} disabled>BNB Smart Chain (Coming Soon)</option>
+                </select>
+                <div class="form-text">The blockchain to use for transactions.</div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="tron_network" class="form-label">TRON Network</label>
+                <select class="form-select" id="tron_network" name="tron_network">
+                    <option value="mainnet" {% if config and config.tron_network == 'mainnet' %}selected{% endif %}>Mainnet (Production)</option>
+                    <option value="shasta" {% if config and config.tron_network == 'shasta' %}selected{% endif %}>Shasta Testnet</option>
+                    <option value="nile" {% if config and config.tron_network == 'nile' %}selected{% endif %}>Nile Testnet</option>
+                </select>
+                <div class="form-text">The TRON network to connect to.</div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="tron_api_keys" class="form-label">TRON API Keys (Optional)</label>
+                <textarea class="form-control" id="tron_api_keys" name="tron_api_keys" rows="2">{{ config.tron_api_keys if config else '' }}</textarea>
+                <div class="form-text">Comma-separated list of TRON API keys for higher rate limits (from TRONGRID).</div>
+            </div>
+            
+            <h5 class="mb-3 mt-4">Sweep Settings</h5>
+            
+            <div class="mb-3 form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="sweep_trx" name="sweep_trx" 
+                       {% if config is none or config.sweep_trx %}checked{% endif %}>
+                <label class="form-check-label" for="sweep_trx">Sweep Native TRX</label>
+                <div class="form-text">Enable sweeping of native TRX from the wallet.</div>
+            </div>
+            
+            <div class="mb-3 form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="sweep_trc20" name="sweep_trc20" 
+                       {% if config and config.sweep_trc20 %}checked{% endif %}>
+                <label class="form-check-label" for="sweep_trc20">Sweep TRC20 Tokens</label>
+                <div class="form-text">Enable sweeping of TRC20 tokens from the wallet.</div>
+            </div>
+            
+            <div class="mb-3 token-config" id="tokenConfigSection" style="{% if not config or not config.sweep_trc20 %}display: none;{% endif %}">
+                <label for="token_contracts" class="form-label">TRC20 Token Contract Addresses</label>
+                <textarea class="form-control" id="token_contracts" name="token_contracts" rows="3" placeholder="Enter comma-separated contract addresses">{% if config and config.token_contracts %}{% set token_list = config.token_contracts|replace('[', '')|replace(']', '')|replace('"', '')|replace(' ', '') %}{{ token_list }}{% endif %}</textarea>
+                <div class="form-text">Comma-separated list of TRC20 token contract addresses to monitor and sweep.</div>
+                
+                {% if tokens %}
+                <div class="mt-3">
+                    <h6>Configured Tokens:</h6>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Name</th>
+                                    <th>Contract</th>
+                                    <th>Decimals</th>
+                                    <th>Min Amount</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for token in tokens %}
+                                <tr>
+                                    <td><strong>{{ token.symbol }}</strong></td>
+                                    <td>{{ token.name }}</td>
+                                    <td>
+                                        <small class="text-muted" title="{{ token.contract_address }}">
+                                            {{ token.contract_address[:8] }}...{{ token.contract_address[-8:] }}
+                                        </small>
+                                    </td>
+                                    <td>{{ token.decimals }}</td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm token-min-amount" 
+                                               data-token-id="{{ token.id }}" 
+                                               value="{{ token.min_transfer_amount or 0 }}" 
+                                               min="0" step="0.01">
+                                    </td>
+                                    <td>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input token-enabled" 
+                                                   type="checkbox" 
+                                                   data-token-id="{{ token.id }}" 
+                                                   {% if token.enabled %}checked{% endif %}>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="form-text">
+                        Set minimum transfer amounts for each token. Changes are automatically saved when you click outside the field.
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="mb-3">
+                <label for="check_interval" class="form-label">Check Interval (seconds)</label>
+                <input type="number" class="form-control" id="check_interval" name="check_interval" 
+                       value="{{ config.check_interval if config else '1' }}" min="1" max="3600">
+                <div class="form-text">How often to check for new funds (in seconds). For ultra-fast response, use 1-3 seconds.</div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="min_transfer_amount" class="form-label">Minimum Transfer Amount (TRX)</label>
+                <input type="number" class="form-control" id="min_transfer_amount" name="min_transfer_amount" 
+                       value="{{ config.min_transfer_amount if config else '0' }}" min="0" step="0.01">
+                <div class="form-text">Minimum amount of TRX to transfer. Set to 0 to transfer any amount after fees.</div>
+            </div>
+            
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-primary">Save Configuration</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Show/hide token configuration section based on checkbox
+    document.addEventListener('DOMContentLoaded', function() {
+        const trc20Checkbox = document.getElementById('sweep_trc20');
+        const tokenSection = document.getElementById('tokenConfigSection');
+        
+        trc20Checkbox.addEventListener('change', function() {
+            tokenSection.style.display = this.checked ? 'block' : 'none';
+        });
+        
+        // Setup token settings handlers
+        setupTokenConfigHandlers();
+    });
+    
+    // Function to handle token configuration updates
+    function setupTokenConfigHandlers() {
+        // Min amount handlers
+        document.querySelectorAll('.token-min-amount').forEach(input => {
+            input.addEventListener('change', function() {
+                const tokenId = this.getAttribute('data-token-id');
+                const value = this.value;
+                
+                updateTokenSetting(tokenId, 'min_transfer_amount', value);
+            });
+        });
+        
+        // Token enabled/disabled handlers
+        document.querySelectorAll('.token-enabled').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const tokenId = this.getAttribute('data-token-id');
+                const value = this.checked;
+                
+                updateTokenSetting(tokenId, 'enabled', value);
+            });
+        });
+    }
+    
+    // Function to send updates to the API
+    function updateTokenSetting(tokenId, field, value) {
+        // Show loading indicator
+        const row = document.querySelector(`[data-token-id="${tokenId}"]`).closest('tr');
+        row.classList.add('table-active');
+        
+        fetch('/api/token/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                token_id: tokenId,
+                field: field,
+                value: value
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Briefly highlight success
+                row.classList.remove('table-active');
+                row.classList.add('table-success');
+                setTimeout(() => {
+                    row.classList.remove('table-success');
+                }, 1000);
+            } else {
+                // Show error
+                console.error('Error updating token:', data.message);
+                row.classList.remove('table-active');
+                row.classList.add('table-danger');
+                setTimeout(() => {
+                    row.classList.remove('table-danger');
+                }, 3000);
+            }
+        })
+        .catch(error => {
+            console.error('Error updating token settings:', error);
+            row.classList.remove('table-active');
+            row.classList.add('table-danger');
+            setTimeout(() => {
+                row.classList.remove('table-danger');
+            }, 3000);
+        });
+    }
+</script>
+{% endblock %}

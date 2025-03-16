@@ -1,0 +1,242 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - TRON Sweeper Bot{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4>Bot Status</h4>
+            </div>
+            <div class="card-body">
+                <div id="status-display">
+                    {% if status.running %}
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                        <h5 class="status-running mb-0">Running</h5>
+                    </div>
+                    {% else %}
+                    <h5 class="status-stopped mb-3">Stopped</h5>
+                    {% endif %}
+                    <p id="status-message">{{ status.status }}</p>
+                    {% if status.last_check %}
+                    <p class="text-secondary">Last updated: <span id="last-check">{{ status.last_check }}</span></p>
+                    {% endif %}
+                </div>
+                <div class="d-flex mt-3">
+                    <button id="start-bot" class="btn btn-success me-2" {% if status.running %}disabled{% endif %}>Start Bot</button>
+                    <button id="stop-bot" class="btn btn-danger" {% if not status.running %}disabled{% endif %}>Stop Bot</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4>Configuration</h4>
+            </div>
+            <div class="card-body">
+                {% if config %}
+                <div class="mb-3">
+                    <h6>Source Wallet:</h6>
+                    <p class="address">{{ config.source_address }}</p>
+                </div>
+                <div class="mb-3">
+                    <h6>Destination Wallet:</h6>
+                    <p class="address">{{ config.destination_address }}</p>
+                </div>
+                <div class="mb-3">
+                    <h6>Blockchain:</h6>
+                    <p><span class="badge bg-secondary">{{ config.blockchain|upper }}</span></p>
+                </div>
+                <div class="mb-3">
+                    <h6>Network:</h6>
+                    <p>{{ config.tron_network }}</p>
+                </div>
+                <div class="mb-3">
+                    <h6>Asset Settings:</h6>
+                    <div>
+                        <span class="badge {% if config.sweep_trx %}bg-success{% else %}bg-secondary{% endif %} me-2">
+                            {% if config.sweep_trx %}✓{% else %}✗{% endif %} TRX
+                        </span>
+                        <span class="badge {% if config.sweep_trc20 %}bg-success{% else %}bg-secondary{% endif %}">
+                            {% if config.sweep_trc20 %}✓{% else %}✗{% endif %} TRC20 Tokens
+                        </span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <h6>Check Interval:</h6>
+                    <p>{{ config.check_interval }} seconds</p>
+                </div>
+                <div class="mb-3">
+                    <h6>Minimum Transfer Amount:</h6>
+                    <p>{{ config.min_transfer_amount }} TRX</p>
+                </div>
+                {% if config.sweep_trc20 and config.token_contracts %}
+                <div class="mb-3">
+                    <h6>Token Contracts:</h6>
+                    <div>
+                        {% set tokens = config.token_contracts|replace('[', '')|replace(']', '')|replace('"', '')|replace(' ', '')|split(',') %}
+                        {% for token in tokens %}
+                            {% if token %}
+                            <div class="badge bg-info mb-1 me-1">{{ token[:8] }}...{{ token[-8:] }}</div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                <div class="mt-3 d-flex flex-wrap gap-2">
+                    <a href="{{ url_for('config') }}" class="btn btn-primary">Edit Configuration</a>
+                    <a href="{{ url_for('download_project') }}" class="btn btn-secondary">
+                        <i class="bi bi-download"></i> Download Project Files
+                    </a>
+                </div>
+                {% else %}
+                <div class="alert alert-warning" role="alert">
+                    No configuration found. Please set up your TRON wallet configuration.
+                </div>
+                <a href="{{ url_for('config') }}" class="btn btn-primary">Set Up Configuration</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h4>Recent Transactions</h4>
+            </div>
+            <div class="card-body">
+                <div id="recent-transactions">
+                    <!-- Transactions will be loaded here via AJAX -->
+                    <div class="text-center py-3">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 text-center">
+                    <a href="{{ url_for('transactions') }}" class="btn btn-secondary">View All Transactions</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Function to load recent transactions
+    function loadRecentTransactions() {
+        fetch('/transactions')
+            .then(response => response.text())
+            .then(html => {
+                // Extract just the transaction table from the response
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const transactionTable = doc.querySelector('.transaction-table');
+                
+                if (transactionTable) {
+                    document.getElementById('recent-transactions').innerHTML = transactionTable.outerHTML;
+                } else {
+                    document.getElementById('recent-transactions').innerHTML = '<p class="text-center">No transactions found</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error loading transactions:', error);
+                document.getElementById('recent-transactions').innerHTML = '<p class="text-center text-danger">Failed to load transactions</p>';
+            });
+    }
+
+    // Function to update bot status
+    function updateBotStatus() {
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                const statusDisplay = document.getElementById('status-display');
+                const startButton = document.getElementById('start-bot');
+                const stopButton = document.getElementById('stop-bot');
+                const statusMessage = document.getElementById('status-message');
+                const lastCheck = document.getElementById('last-check');
+                
+                if (data.running) {
+                    statusDisplay.innerHTML = `
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                            <h5 class="status-running mb-0">Running</h5>
+                        </div>
+                        <p id="status-message">${data.status}</p>
+                        <p class="text-secondary">Last updated: <span id="last-check">${data.last_check}</span></p>
+                    `;
+                    startButton.disabled = true;
+                    stopButton.disabled = false;
+                } else {
+                    statusDisplay.innerHTML = `
+                        <h5 class="status-stopped mb-3">Stopped</h5>
+                        <p id="status-message">${data.status}</p>
+                        ${data.last_check ? `<p class="text-secondary">Last updated: <span id="last-check">${data.last_check}</span></p>` : ''}
+                    `;
+                    startButton.disabled = false;
+                    stopButton.disabled = true;
+                }
+            })
+            .catch(error => {
+                console.error('Error updating status:', error);
+            });
+    }
+
+    // Event listeners for buttons
+    document.getElementById('start-bot').addEventListener('click', function() {
+        fetch('/api/start', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateBotStatus();
+            } else {
+                alert('Failed to start bot: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error starting bot:', error);
+            alert('An error occurred while starting the bot');
+        });
+    });
+
+    document.getElementById('stop-bot').addEventListener('click', function() {
+        fetch('/api/stop', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateBotStatus();
+            } else {
+                alert('Failed to stop bot: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error stopping bot:', error);
+            alert('An error occurred while stopping the bot');
+        });
+    });
+
+    // Load initial data
+    loadRecentTransactions();
+    
+    // Set up polling for status updates
+    setInterval(updateBotStatus, 5000);
+    setInterval(loadRecentTransactions, 30000);
+</script>
+{% endblock %}

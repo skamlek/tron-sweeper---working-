@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block title %}Transactions - TRON Sweeper Bot{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h4>Transaction History</h4>
+        <span class="badge bg-secondary">{{ transactions|length if transactions else 0 }} transactions</span>
+    </div>
+    <div class="card-body">
+        {% if transactions %}
+        <div class="table-responsive transaction-table">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>TxID</th>
+                        <th>From</th>
+                        <th>To</th>
+                        <th>Amount</th>
+                        <th>Asset</th>
+                        <th>Blockchain</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in transactions %}
+                    <tr>
+                        <td>{{ tx.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td>
+                            {% if tx.blockchain == 'tron' %}
+                            <a href="https://tronscan.org/#/transaction/{{ tx.txid }}" target="_blank" title="{{ tx.txid }}">
+                                {{ tx.txid[:8] }}...
+                            </a>
+                            {% elif tx.blockchain == 'bsc' %}
+                            <a href="https://bscscan.com/tx/{{ tx.txid }}" target="_blank" title="{{ tx.txid }}">
+                                {{ tx.txid[:8] }}...
+                            </a>
+                            {% else %}
+                            <span title="{{ tx.txid }}">{{ tx.txid[:8] }}...</span>
+                            {% endif %}
+                        </td>
+                        <td class="address">
+                            <span title="{{ tx.source_address }}">{{ tx.source_address[:8] }}...</span>
+                        </td>
+                        <td class="address">
+                            <span title="{{ tx.destination_address }}">{{ tx.destination_address[:8] }}...</span>
+                        </td>
+                        <td>
+                            {% if tx.amount|int == tx.amount %}
+                                {{ tx.amount|int }}
+                            {% else %}
+                                {{ "%.6f"|format(tx.amount) }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if tx.token_address %}
+                            <span class="badge bg-primary d-flex align-items-center" 
+                                  title="{{ tx.token_address }}">
+                                <span class="badge bg-dark me-1" style="font-size: 0.7em;">TRC20</span>
+                                {{ tx.token_symbol }}
+                            </span>
+                            {% else %}
+                            <span class="badge bg-success">{{ tx.token_symbol or 'TRX' }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ tx.blockchain|upper }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info" role="alert">
+            <i class="bi bi-info-circle me-2"></i>
+            No transactions have been recorded yet.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
